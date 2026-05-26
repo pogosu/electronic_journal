@@ -64,7 +64,7 @@ export default class Journal extends Entity {
   }
 
   static async findAll(options = {}) {
-    const { groupId, teacherId, discipline } = options;
+    const { groupId, teacherId, discipline, type } = options;
     let sql = `SELECT j.*, g.name as group_name, g.admission_year, u.full_name as teacher_name, d.name as discipline_name
                FROM journals j
                JOIN groups g ON g.id = j.group_id
@@ -76,6 +76,7 @@ export default class Journal extends Entity {
     if (groupId) { conditions.push(`j.group_id = $${params.length + 1}`); params.push(groupId); }
     if (teacherId) { conditions.push(`j.teacher_id = $${params.length + 1}`); params.push(teacherId); }
     if (discipline) { conditions.push(`d.name ILIKE $${params.length + 1}`); params.push(`%${discipline}%`); }
+    if (type) { conditions.push(`j.type = $${params.length + 1}`); params.push(type); }
     if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
     sql += ' ORDER BY d.name, g.name';
     const result = await query(sql, params);
@@ -135,21 +136,35 @@ export default class Journal extends Entity {
       gradeMap[`${g.student_id}-${g.work_id}`] = g.score;
     }
     return {
-      students: students.map((s) => ({
-        id: s.id,
-        fullName: s.full_name,
-        login: s.login,
-        grades: works.map((w) => ({
-          workId: w.id,
-          score: gradeMap[`${s.id}-${w.id}`] ?? null,
-        })),
-      })),
+      journal: {
+        id: this.id,
+        discipline_name: this.disciplineName,
+        group_name: this.groupName,
+        semester: this.semester,
+      },
       works: works.map((w) => ({
         id: w.id,
         title: w.title,
-        type: w.work_type_name,
-        maxScore: w.max_score,
-        isMandatory: w.is_mandatory,
+        work_type_name: w.work_type_name,
+        work_type_slug: w.work_type_slug,
+        grade_system_name: w.grade_system_name,
+        max_score: w.max_score,
+        min_score: w.min_score,
+        is_mandatory: w.is_mandatory,
+        deadline: w.deadline,
+      })),
+      table: students.map((s) => ({
+        studentId: s.id,
+        fullName: s.full_name,
+        grades: works.map((w) => ({
+          workId: w.id,
+          title: w.title,
+          score: gradeMap[`${s.id}-${w.id}`] ?? null,
+          maxScore: w.max_score,
+          minScore: w.min_score,
+          gradeSystem: w.grade_system_name,
+          isMandatory: w.is_mandatory,
+        })),
       })),
     };
   }
@@ -169,19 +184,30 @@ export default class Journal extends Entity {
       attendanceMap[`${a.student_id}-${a.lesson_id}`] = a.status;
     }
     return {
-      students: students.map((s) => ({
-        id: s.id,
-        fullName: s.full_name,
-        login: s.login,
-        attendance: lessons.map((l) => ({
-          lessonId: l.id,
-          status: attendanceMap[`${s.id}-${l.id}`] ?? null,
-        })),
-      })),
+      journal: {
+        id: this.id,
+        discipline_name: this.disciplineName,
+        group_name: this.groupName,
+        semester: this.semester,
+      },
       lessons: lessons.map((l) => ({
         id: l.id,
-        date: l.lesson_date,
-        type: l.lesson_type_name,
+        lesson_date: l.lesson_date,
+        lesson_type_name: l.lesson_type_name,
+        lesson_type_slug: l.lesson_type_slug,
+        display_order: l.display_order,
+      })),
+      table: students.map((s) => ({
+        studentId: s.id,
+        fullName: s.full_name,
+        attendances: lessons.map((l) => ({
+          lessonId: l.id,
+          lessonDate: l.lesson_date,
+          lessonTypeId: l.lesson_type_id,
+          lessonTypeName: l.lesson_type_name,
+          lessonTypeSlug: l.lesson_type_slug,
+          status: attendanceMap[`${s.id}-${l.id}`] ?? null,
+        })),
       })),
     };
   }

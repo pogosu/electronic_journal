@@ -4,11 +4,12 @@ import LessonService from '../services/LessonService.js';
 
 export async function getJournals(req, res, next) {
   try {
-    const { groupId, teacherId, discipline } = req.query;
+    const { groupId, teacherId, discipline, type } = req.query;
     const options = {};
     if (groupId) options.groupId = groupId;
     if (teacherId) options.teacherId = teacherId;
     if (discipline) options.discipline = discipline;
+    if (type) options.type = type;
     const journals = await JournalService.getJournals(options, req.user);
     res.json(journals);
   } catch (err) {
