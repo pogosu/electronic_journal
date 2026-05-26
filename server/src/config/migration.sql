@@ -192,7 +192,8 @@ CREATE TABLE IF NOT EXISTS grades (
     work_id INT NOT NULL REFERENCES works(id) ON DELETE CASCADE,
     score NUMERIC(5,2) NOT NULL,
     grade_date DATE DEFAULT CURRENT_DATE,
-    teacher_id INT REFERENCES teachers(id) ON DELETE SET NULL
+    teacher_id INT REFERENCES teachers(id) ON DELETE SET NULL,
+    UNIQUE(student_id, work_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_grades_student_id ON grades USING btree (student_id);
