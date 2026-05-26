@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: ej-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: electronic_journal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/src/config/migration.sql:/docker-entrypoint-initdb.d/01-migration.sql
+      - ./server/src/config/seeds.sql:/docker-entrypoint-initdb.d/02-seeds.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - ej-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d electronic_journal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ej-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: electronic_journal
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: electronic_journal_super_secret_key_2026
+      JWT_EXPIRES_IN: 24h
+      BCRYPT_SALT_ROUNDS: 10
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ej-network
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: ej-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ej-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ej-network:
+    driver: bridge
