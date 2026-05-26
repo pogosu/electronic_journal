@@ -1,0 +1,10 @@
+export { default as AuditService } from './AuditService.js';
+export { default as GradeService } from './GradeService.js';
+export { default as JournalService } from './JournalService.js';
+export { default as AssignmentService } from './AssignmentService.js';
+export { default as UserService } from './UserService.js';
+export { default as DeanReportService } from './DeanReportService.js';
+export { default as AttendanceService } from './AttendanceService.js';
+export { default as WorkService } from './WorkService.js';
+export { default as LessonService } from './LessonService.js';
+export { default as DictionaryService } from './DictionaryService.js';

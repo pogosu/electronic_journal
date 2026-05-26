@@ -1,7 +1,10 @@
 import { query, getClient } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class Assignment {
-  #id;
+export default class Assignment extends Entity {
+  static tableName = 'teacher_assignments';
+  static columns = ['teacher_id', 'group_id', 'discipline_id', 'semester'];
+
   #teacherId;
   #groupId;
   #disciplineId;
@@ -9,7 +12,7 @@ export default class Assignment {
   #createdAt;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#teacherId = data.teacher_id ?? data.teacherId ?? null;
     this.#groupId = data.group_id ?? data.groupId ?? null;
     this.#disciplineId = data.discipline_id ?? data.disciplineId ?? null;
@@ -17,11 +20,14 @@ export default class Assignment {
     this.#createdAt = data.created_at ?? data.createdAt ?? null;
   }
 
-  get id() { return this.#id; }
   get teacherId() { return this.#teacherId; }
   get groupId() { return this.#groupId; }
   get disciplineId() { return this.#disciplineId; }
   get semester() { return this.#semester; }
+
+  getColumnValues() {
+    return [this.#teacherId, this.#groupId, this.#disciplineId, this.#semester];
+  }
 
   static async findAll(options = {}) {
     const { teacherUserId } = options;
@@ -91,10 +97,6 @@ export default class Assignment {
     }
   }
 
-  async delete() {
-    await query('DELETE FROM teacher_assignments WHERE id = $1', [this.#id]);
-  }
-
   static async deleteJournals(assignment) {
     await query(
       `DELETE FROM journals
@@ -105,7 +107,7 @@ export default class Assignment {
 
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       teacher_id: this.#teacherId,
       group_id: this.#groupId,
       discipline_id: this.#disciplineId,

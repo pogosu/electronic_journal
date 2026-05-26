@@ -1,8 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { query, getClient } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class User {
-  #id;
+export default class User extends Entity {
+  static tableName = 'users';
+  static columns = ['login', 'password_hash', 'full_name', 'role_id', 'is_blocked'];
+
   #login;
   #passwordHash;
   #fullName;
@@ -12,7 +15,7 @@ export default class User {
   #updatedAt;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#login = data.login ?? '';
     this.#passwordHash = data.password_hash ?? data.passwordHash ?? '';
     this.#fullName = data.full_name ?? data.fullName ?? '';
@@ -22,44 +25,45 @@ export default class User {
     this.#updatedAt = data.updated_at ?? data.updatedAt ?? null;
   }
 
-  get id() {
-    return this.#id;
+  get login() { return this.#login; }
+  get fullName() { return this.#fullName; }
+  get role() { return this.#role; }
+  get isBlocked() { return this.#isBlocked; }
+  get passwordHash() { return this.#passwordHash; }
+  get createdAt() { return this.#createdAt; }
+  get updatedAt() { return this.#updatedAt; }
+
+  set fullName(value) { this.#fullName = value; }
+  set role(value) { this.#role = value; }
+  set isBlocked(value) { this.#isBlocked = value; }
+  set passwordHash(value) { this.#passwordHash = value; }
+
+  async getRoleId() {
+    const roleRes = await query('SELECT id FROM roles WHERE name = $1', [this.#role]);
+    if (roleRes.rows.length === 0) throw new Error('Неверная роль');
+    return roleRes.rows[0].id;
   }
 
-  get login() {
-    return this.#login;
+  getColumnValues() {
+    // Этот метод вызывается из save(), но save() переопределён ниже
+    return [this.#login, this.#passwordHash, this.#fullName, null, this.#isBlocked];
   }
 
-  get fullName() {
-    return this.#fullName;
-  }
-
-  get role() {
-    return this.#role;
-  }
-
-  get isBlocked() {
-    return this.#isBlocked;
-  }
-
-  get passwordHash() {
-    return this.#passwordHash;
-  }
-
-  set fullName(value) {
-    this.#fullName = value;
-  }
-
-  set role(value) {
-    this.#role = value;
-  }
-
-  set isBlocked(value) {
-    this.#isBlocked = value;
-  }
-
-  set passwordHash(value) {
-    this.#passwordHash = value;
+  async save() {
+    const roleId = await this.getRoleId();
+    if (this.id) {
+      await query(
+        `UPDATE users SET full_name = $1, role_id = $2, is_blocked = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+        [this.#fullName, roleId, this.#isBlocked, this.id]
+      );
+    } else {
+      const result = await query(
+        `INSERT INTO users (login, password_hash, full_name, role_id, is_blocked) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [this.#login, this.#passwordHash, this.#fullName, roleId, this.#isBlocked]
+      );
+      this._setId(result.rows[0].id);
+    }
+    return this;
   }
 
   static async findById(id) {
@@ -184,21 +188,6 @@ export default class User {
     }
   }
 
-  async save() {
-    if (this.#id) {
-      const roleRes = await query('SELECT id FROM roles WHERE name = $1', [this.#role]);
-      if (roleRes.rows.length === 0) throw new Error('Неверная роль');
-      await query(
-        `UPDATE users SET full_name = $1, role_id = $2, is_blocked = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
-        [this.#fullName, roleRes.rows[0].id, this.#isBlocked, this.#id]
-      );
-    }
-  }
-
-  async delete() {
-    await query('DELETE FROM users WHERE id = $1', [this.#id]);
-  }
-
   static async updateStudentGroup(userId, groupId) {
     await query('UPDATE students SET group_id = $1 WHERE user_id = $2', [groupId, userId]);
   }
@@ -218,7 +207,7 @@ export default class User {
 
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       login: this.#login,
       fullName: this.#fullName,
       role: this.#role,

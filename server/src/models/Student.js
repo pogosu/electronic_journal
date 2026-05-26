@@ -13,17 +13,9 @@ export default class Student extends User {
     this.#groupName = data.group_name ?? data.groupName ?? null;
   }
 
-  get studentId() {
-    return this.#studentId;
-  }
-
-  get groupId() {
-    return this.#groupId;
-  }
-
-  get groupName() {
-    return this.#groupName;
-  }
+  get studentId() { return this.#studentId; }
+  get groupId() { return this.#groupId; }
+  get groupName() { return this.#groupName; }
 
   static async findByUserId(userId) {
     const result = await query(
@@ -195,7 +187,6 @@ export default class Student extends User {
     const grades = gradesRes.rows;
     const attendances = attendanceRes.rows;
 
-    // Exam average: only credit/final_exam works with numeric grade systems
     const examGrades = grades.filter((g) =>
       ['credit', 'final_exam'].includes(g.work_type_slug) &&
       g.grade_system_name !== 'Зачёт/Незачёт'

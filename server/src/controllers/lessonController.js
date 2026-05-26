@@ -1,5 +1,7 @@
 import Lesson from '../models/Lesson.js';
 import Work from '../models/Work.js';
+import LessonService from '../services/LessonService.js';
+import WorkService from '../services/WorkService.js';
 import AuditLog from '../models/AuditLog.js';
 
 export async function updateLesson(req, res, next) {
@@ -34,7 +36,7 @@ export async function deleteLesson(req, res, next) {
     if (!lesson) {
       return res.status(404).json({ error: 'Занятие не найдено' });
     }
-    const canDelete = await Lesson.canDelete(id);
+    const canDelete = await LessonService.canDeleteLesson(id);
     if (!canDelete) {
       return res.status(400).json({ error: 'Нельзя удалить занятие с установленной посещаемостью' });
     }
@@ -60,7 +62,7 @@ export async function reorderLessons(req, res, next) {
     if (!Array.isArray(lessonIds)) {
       return res.status(400).json({ error: 'lessonIds должен быть массивом' });
     }
-    await Lesson.reorder(journalId, lessonIds);
+    await LessonService.reorderLessons(journalId, lessonIds);
     await AuditLog.create({
       userId: req.user.userId,
       action: 'REORDER_LESSONS',
@@ -80,7 +82,7 @@ export async function reorderWorks(req, res, next) {
     if (!Array.isArray(workIds)) {
       return res.status(400).json({ error: 'workIds должен быть массивом' });
     }
-    await Work.reorder(journalId, workIds);
+    await WorkService.reorderWorks(journalId, workIds);
     await AuditLog.create({
       userId: req.user.userId,
       action: 'REORDER_WORKS',

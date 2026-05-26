@@ -1,7 +1,10 @@
 import { query } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class Lesson {
-  #id;
+export default class Lesson extends Entity {
+  static tableName = 'lessons';
+  static columns = ['journal_id', 'lesson_date', 'lesson_type_id', 'display_order'];
+
   #journalId;
   #lessonDate;
   #lessonTypeId;
@@ -10,7 +13,7 @@ export default class Lesson {
   #displayOrder;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#journalId = data.journal_id ?? data.journalId ?? null;
     this.#lessonDate = data.lesson_date ?? data.lessonDate ?? null;
     this.#lessonTypeId = data.lesson_type_id ?? data.lessonTypeId ?? null;
@@ -19,7 +22,6 @@ export default class Lesson {
     this.#displayOrder = data.display_order ?? data.displayOrder ?? 0;
   }
 
-  get id() { return this.#id; }
   get journalId() { return this.#journalId; }
   get lessonDate() { return this.#lessonDate; }
   get lessonTypeId() { return this.#lessonTypeId; }
@@ -30,6 +32,10 @@ export default class Lesson {
   set lessonDate(value) { this.#lessonDate = value; }
   set lessonTypeId(value) { this.#lessonTypeId = value; }
   set displayOrder(value) { this.#displayOrder = value; }
+
+  getColumnValues() {
+    return [this.#journalId, this.#lessonDate, this.#lessonTypeId, this.#displayOrder];
+  }
 
   static async findById(id) {
     const result = await query(
@@ -55,25 +61,6 @@ export default class Lesson {
     return result.rows.map((row) => new Lesson(row));
   }
 
-  async save() {
-    if (this.#id) {
-      await query(
-        'UPDATE lessons SET lesson_date = $1, lesson_type_id = $2, display_order = $3 WHERE id = $4',
-        [this.#lessonDate, this.#lessonTypeId, this.#displayOrder, this.#id]
-      );
-    } else {
-      const result = await query(
-        'INSERT INTO lessons (journal_id, lesson_date, lesson_type_id, display_order) VALUES ($1, $2, $3, $4) RETURNING id',
-        [this.#journalId, this.#lessonDate, this.#lessonTypeId, this.#displayOrder]
-      );
-      this.#id = result.rows[0].id;
-    }
-  }
-
-  async delete() {
-    await query('DELETE FROM lessons WHERE id = $1', [this.#id]);
-  }
-
   static async canDelete(id) {
     const result = await query('SELECT id FROM attendances WHERE lesson_id = $1 LIMIT 1', [id]);
     return result.rows.length === 0;
@@ -90,7 +77,7 @@ export default class Lesson {
 
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       journal_id: this.#journalId,
       lesson_date: this.#lessonDate,
       lesson_type_id: this.#lessonTypeId,

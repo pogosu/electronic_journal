@@ -1,7 +1,6 @@
-import Journal from '../models/Journal.js';
-import Work from '../models/Work.js';
-import Lesson from '../models/Lesson.js';
-import Teacher from '../models/Teacher.js';
+import JournalService from '../services/JournalService.js';
+import WorkService from '../services/WorkService.js';
+import LessonService from '../services/LessonService.js';
 
 export async function getJournals(req, res, next) {
   try {
@@ -10,12 +9,8 @@ export async function getJournals(req, res, next) {
     if (groupId) options.groupId = groupId;
     if (teacherId) options.teacherId = teacherId;
     if (discipline) options.discipline = discipline;
-    if (req.user.role === 'teacher') {
-      const teacherId = await Teacher.getIdByUserId(req.user.userId);
-      if (teacherId) options.teacherId = teacherId;
-    }
-    const journals = await Journal.findAll(options);
-    res.json(journals.map((j) => j.toJSON()));
+    const journals = await JournalService.getJournals(options, req.user);
+    res.json(journals);
   } catch (err) {
     next(err);
   }
@@ -24,22 +19,12 @@ export async function getJournals(req, res, next) {
 export async function getJournalById(req, res, next) {
   try {
     const { id } = req.params;
-    const journal = await Journal.findById(id);
-    if (!journal) {
-      return res.status(404).json({ error: 'Журнал не найден' });
-    }
-    const [works, lessons, students] = await Promise.all([
-      journal.getWorks(),
-      journal.getLessons(),
-      journal.getStudents(),
-    ]);
-    res.json({
-      ...journal.toJSON(),
-      works,
-      lessons,
-      students,
-    });
+    const data = await JournalService.getJournalById(id);
+    res.json(data);
   } catch (err) {
+    if (err.message === 'Журнал не найден') {
+      return res.status(404).json({ error: err.message });
+    }
     next(err);
   }
 }
@@ -47,15 +32,8 @@ export async function getJournalById(req, res, next) {
 export async function createJournal(req, res, next) {
   try {
     const { groupId, teacherId, disciplineId, semester } = req.body;
-    const journal = new Journal({
-      group_id: groupId,
-      teacher_id: teacherId,
-      discipline_id: disciplineId,
-      semester,
-      type: 'grades',
-    });
-    await journal.save();
-    res.status(201).json(journal.toJSON());
+    const journal = await JournalService.createJournal({ groupId, teacherId, disciplineId, semester }, req.user);
+    res.status(201).json(journal);
   } catch (err) {
     next(err);
   }
@@ -64,23 +42,12 @@ export async function createJournal(req, res, next) {
 export async function createWork(req, res, next) {
   try {
     const { journalId } = req.params;
-    const work = new Work({
-      journal_id: journalId,
-      title: req.body.title,
-      work_type_id: req.body.work_type_id,
-      grade_system_id: req.body.grade_system_id,
-      min_score: req.body.min_score || 0,
-      max_score: req.body.max_score,
-      is_mandatory: req.body.is_mandatory !== false,
-      deadline: req.body.deadline || null,
-      display_order: req.body.display_order || 0,
-    });
-    if (!work.workTypeId || !work.gradeSystemId) {
-      return res.status(400).json({ error: 'work_type_id и grade_system_id обязательны' });
-    }
-    await work.save();
-    res.status(201).json(work.toJSON());
+    const work = await WorkService.createWork(journalId, req.body, req.user);
+    res.status(201).json(work);
   } catch (err) {
+    if (err.message === 'work_type_id и grade_system_id обязательны') {
+      return res.status(400).json({ error: err.message });
+    }
     next(err);
   }
 }
@@ -88,14 +55,8 @@ export async function createWork(req, res, next) {
 export async function createLesson(req, res, next) {
   try {
     const { journalId } = req.params;
-    const lesson = new Lesson({
-      journal_id: journalId,
-      lesson_date: req.body.lessonDate,
-      lesson_type_id: req.body.lessonTypeId,
-      display_order: req.body.displayOrder || 0,
-    });
-    await lesson.save();
-    res.status(201).json(lesson.toJSON());
+    const lesson = await LessonService.createLesson(journalId, req.body, req.user);
+    res.status(201).json(lesson);
   } catch (err) {
     next(err);
   }
@@ -104,13 +65,12 @@ export async function createLesson(req, res, next) {
 export async function getJournalAttendanceTable(req, res, next) {
   try {
     const { id } = req.params;
-    const journal = await Journal.findById(id);
-    if (!journal) {
-      return res.status(404).json({ error: 'Журнал не найден' });
-    }
-    const data = await journal.getAttendanceTable();
+    const data = await JournalService.getAttendanceTable(id);
     res.json(data);
   } catch (err) {
+    if (err.message === 'Журнал не найден') {
+      return res.status(404).json({ error: err.message });
+    }
     next(err);
   }
 }
@@ -118,13 +78,12 @@ export async function getJournalAttendanceTable(req, res, next) {
 export async function getJournalTable(req, res, next) {
   try {
     const { id } = req.params;
-    const journal = await Journal.findById(id);
-    if (!journal) {
-      return res.status(404).json({ error: 'Журнал не найден' });
-    }
-    const data = await journal.getGradeTable();
+    const data = await JournalService.getGradeTable(id);
     res.json(data);
   } catch (err) {
+    if (err.message === 'Журнал не найден') {
+      return res.status(404).json({ error: err.message });
+    }
     next(err);
   }
 }

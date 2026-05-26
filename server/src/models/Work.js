@@ -1,7 +1,10 @@
 import { query } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class Work {
-  #id;
+export default class Work extends Entity {
+  static tableName = 'works';
+  static columns = ['journal_id', 'title', 'work_type_id', 'grade_system_id', 'min_score', 'max_score', 'is_mandatory', 'deadline', 'display_order'];
+
   #journalId;
   #title;
   #workTypeId;
@@ -16,7 +19,7 @@ export default class Work {
   #isActive;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#journalId = data.journal_id ?? data.journalId ?? null;
     this.#title = data.title ?? '';
     this.#workTypeId = data.work_type_id ?? data.workTypeId ?? null;
@@ -31,7 +34,6 @@ export default class Work {
     this.#isActive = data.is_active ?? data.isActive ?? true;
   }
 
-  get id() { return this.#id; }
   get journalId() { return this.#journalId; }
   get title() { return this.#title; }
   get workTypeId() { return this.#workTypeId; }
@@ -54,9 +56,18 @@ export default class Work {
   set deadline(value) { this.#deadline = value; }
   set displayOrder(value) { this.#displayOrder = value; }
 
+  getColumnValues() {
+    return [this.#journalId, this.#title, this.#workTypeId, this.#gradeSystemId, this.#minScore, this.#maxScore, this.#isMandatory, this.#deadline, this.#displayOrder];
+  }
+
+  validateScore(score) {
+    const num = parseFloat(score);
+    return num >= this.#minScore && num <= this.#maxScore;
+  }
+
   static async findById(id) {
     const result = await query(
-      `SELECT w.*, wt.name as work_type_name, gs.name as grade_system_name
+      `SELECT w.*, wt.name as work_type_name, wt.slug as work_type_slug, gs.name as grade_system_name
        FROM works w
        JOIN work_types wt ON wt.id = w.work_type_id
        JOIN grade_systems gs ON gs.id = w.grade_system_id
@@ -69,7 +80,7 @@ export default class Work {
 
   static async findByJournal(journalId) {
     const result = await query(
-      `SELECT w.*, wt.name as work_type_name, gs.name as grade_system_name
+      `SELECT w.*, wt.name as work_type_name, wt.slug as work_type_slug, gs.name as grade_system_name
        FROM works w
        JOIN work_types wt ON wt.id = w.work_type_id
        JOIN grade_systems gs ON gs.id = w.grade_system_id
@@ -81,49 +92,16 @@ export default class Work {
   }
 
   static async findDictionaries() {
-    const [workTypesRes, gradeSystemsRes, lessonTypesRes] = await Promise.all([
+    const [workTypes, gradeSystems, lessonTypes] = await Promise.all([
       query('SELECT * FROM work_types ORDER BY name'),
       query('SELECT * FROM grade_systems ORDER BY name'),
       query('SELECT * FROM lesson_types ORDER BY name'),
     ]);
     return {
-      workTypes: workTypesRes.rows,
-      gradeSystems: gradeSystemsRes.rows.filter((s) => s.name !== '100-балльная'),
-      lessonTypes: lessonTypesRes.rows,
+      workTypes: workTypes.rows,
+      gradeSystems: gradeSystems.rows,
+      lessonTypes: lessonTypes.rows,
     };
-  }
-
-  validateScore(score) {
-    const num = parseFloat(score);
-    return num >= this.#minScore && num <= this.#maxScore;
-  }
-
-  async save() {
-    if (this.#id) {
-      await query(
-        `UPDATE works SET title = $1, work_type_id = $2, grade_system_id = $3, min_score = $4, max_score = $5,
-         is_mandatory = $6, deadline = $7, display_order = $8 WHERE id = $9`,
-        [this.#title, this.#workTypeId, this.#gradeSystemId, this.#minScore, this.#maxScore,
-         this.#isMandatory, this.#deadline, this.#displayOrder, this.#id]
-      );
-    } else {
-      const result = await query(
-        `INSERT INTO works (journal_id, title, work_type_id, grade_system_id, min_score, max_score, is_mandatory, deadline, display_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-        [this.#journalId, this.#title, this.#workTypeId, this.#gradeSystemId, this.#minScore, this.#maxScore,
-         this.#isMandatory, this.#deadline, this.#displayOrder]
-      );
-      this.#id = result.rows[0].id;
-    }
-  }
-
-  async delete() {
-    const gradesRes = await query('SELECT COUNT(*) FROM grades WHERE work_id = $1', [this.#id]);
-    if (parseInt(gradesRes.rows[0].count) > 0) {
-      await query('UPDATE works SET is_active = false WHERE id = $1', [this.#id]);
-    } else {
-      await query('DELETE FROM works WHERE id = $1', [this.#id]);
-    }
   }
 
   static async reorder(journalId, workIds) {
@@ -135,9 +113,19 @@ export default class Work {
     }
   }
 
+  async delete() {
+    const gradesRes = await query('SELECT COUNT(*) FROM grades WHERE work_id = $1', [this.id]);
+    if (parseInt(gradesRes.rows[0].count) > 0) {
+      await query('UPDATE works SET is_active = false WHERE id = $1', [this.id]);
+      this.#isActive = false;
+    } else {
+      await super.delete();
+    }
+  }
+
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       journal_id: this.#journalId,
       title: this.#title,
       work_type_id: this.#workTypeId,

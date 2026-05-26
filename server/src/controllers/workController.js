@@ -1,10 +1,11 @@
 import Work from '../models/Work.js';
+import WorkService from '../services/WorkService.js';
 import AuditLog from '../models/AuditLog.js';
 
 export async function getWorksByJournal(req, res, next) {
   try {
     const { journalId } = req.params;
-    const works = await Work.findByJournal(journalId);
+    const works = await WorkService.getWorksByJournal(journalId);
     res.json(works.map((w) => w.toJSON()));
   } catch (err) {
     next(err);
@@ -14,26 +15,12 @@ export async function getWorksByJournal(req, res, next) {
 export async function createWork(req, res, next) {
   try {
     const { journalId } = req.params;
-    const work = new Work({
-      journal_id: journalId,
-      title: req.body.title,
-      work_type_id: req.body.work_type_id,
-      grade_system_id: req.body.grade_system_id,
-      min_score: req.body.min_score || 0,
-      max_score: req.body.max_score,
-      is_mandatory: req.body.is_mandatory !== false,
-      deadline: req.body.deadline || null,
-      display_order: req.body.display_order || 0,
-    });
-    await work.save();
-    await AuditLog.create({
-      userId: req.user.userId,
-      action: 'CREATE_WORK',
-      tableName: 'works',
-      newValue: work.toJSON(),
-    });
-    res.status(201).json(work.toJSON());
+    const work = await WorkService.createWork(journalId, req.body, req.user);
+    res.status(201).json(work);
   } catch (err) {
+    if (err.message === 'work_type_id и grade_system_id обязательны') {
+      return res.status(400).json({ error: err.message });
+    }
     next(err);
   }
 }
@@ -93,7 +80,7 @@ export async function deleteWork(req, res, next) {
 
 export async function getWorkDictionaries(req, res, next) {
   try {
-    const dicts = await Work.findDictionaries();
+    const dicts = await WorkService.getDictionaries();
     res.json(dicts);
   } catch (err) {
     next(err);

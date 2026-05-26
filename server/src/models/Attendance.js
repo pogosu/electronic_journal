@@ -1,27 +1,53 @@
 import { query } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class Attendance {
-  #id;
+export default class Attendance extends Entity {
+  static tableName = 'attendances';
+  static columns = ['student_id', 'lesson_id', 'status'];
+
   #studentId;
   #lessonId;
   #status;
   #attendanceDate;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#studentId = data.student_id ?? data.studentId ?? null;
     this.#lessonId = data.lesson_id ?? data.lessonId ?? null;
     this.#status = data.status ?? null;
     this.#attendanceDate = data.attendance_date ?? data.attendanceDate ?? null;
   }
 
-  get id() { return this.#id; }
   get studentId() { return this.#studentId; }
   get lessonId() { return this.#lessonId; }
   get status() { return this.#status; }
   get attendanceDate() { return this.#attendanceDate; }
 
   set status(value) { this.#status = value; }
+
+  getColumnValues() {
+    return [this.#studentId, this.#lessonId, this.#status];
+  }
+
+  async save() {
+    if (this.id) {
+      await query(
+        'UPDATE attendances SET status = $1, attendance_date = CURRENT_DATE WHERE id = $2',
+        [this.#status, this.id]
+      );
+    } else {
+      const result = await query(
+        `INSERT INTO attendances (student_id, lesson_id, status) VALUES ($1, $2, $3)
+         ON CONFLICT (student_id, lesson_id) DO UPDATE SET status = EXCLUDED.status, attendance_date = CURRENT_DATE
+         RETURNING id`,
+        [this.#studentId, this.#lessonId, this.#status]
+      );
+      if (result.rows[0]?.id) {
+        this._setId(result.rows[0].id);
+      }
+    }
+    return this;
+  }
 
   static async findById(id) {
     const result = await query('SELECT * FROM attendances WHERE id = $1', [id]);
@@ -116,34 +142,13 @@ export default class Attendance {
     return result.rows;
   }
 
-  async save() {
-    if (this.#id) {
-      await query(
-        'UPDATE attendances SET status = $1, attendance_date = CURRENT_DATE WHERE id = $2',
-        [this.#status, this.#id]
-      );
-    } else {
-      const result = await query(
-        `INSERT INTO attendances (student_id, lesson_id, status) VALUES ($1, $2, $3)
-         ON CONFLICT (student_id, lesson_id) DO UPDATE SET status = EXCLUDED.status, attendance_date = CURRENT_DATE
-         RETURNING id`,
-        [this.#studentId, this.#lessonId, this.#status]
-      );
-      this.#id = result.rows[0]?.id ?? this.#id;
-    }
-  }
-
-  async delete() {
-    await query('DELETE FROM attendances WHERE id = $1', [this.#id]);
-  }
-
   isAbsent() {
     return this.#status === 'absent';
   }
 
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       student_id: this.#studentId,
       lesson_id: this.#lessonId,
       status: this.#status,

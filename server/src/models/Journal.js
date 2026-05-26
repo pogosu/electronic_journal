@@ -1,7 +1,10 @@
 import { query } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class Journal {
-  #id;
+export default class Journal extends Entity {
+  static tableName = 'journals';
+  static columns = ['group_id', 'teacher_id', 'discipline_id', 'semester', 'type'];
+
   #groupId;
   #groupName;
   #teacherId;
@@ -13,7 +16,7 @@ export default class Journal {
   #admissionYear;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#groupId = data.group_id ?? data.groupId ?? null;
     this.#groupName = data.group_name ?? data.groupName ?? null;
     this.#teacherId = data.teacher_id ?? data.teacherId ?? null;
@@ -21,18 +24,29 @@ export default class Journal {
     this.#disciplineId = data.discipline_id ?? data.disciplineId ?? null;
     this.#disciplineName = data.discipline_name ?? data.disciplineName ?? null;
     this.#semester = data.semester ?? '';
-    this.#type = data.type ?? 'grades';
+    this.#type = data.type ?? '';
     this.#admissionYear = data.admission_year ?? data.admissionYear ?? null;
   }
 
-  get id() { return this.#id; }
   get groupId() { return this.#groupId; }
   get groupName() { return this.#groupName; }
   get teacherId() { return this.#teacherId; }
+  get teacherName() { return this.#teacherName; }
   get disciplineId() { return this.#disciplineId; }
   get disciplineName() { return this.#disciplineName; }
   get semester() { return this.#semester; }
   get type() { return this.#type; }
+  get admissionYear() { return this.#admissionYear; }
+
+  set groupId(value) { this.#groupId = value; }
+  set teacherId(value) { this.#teacherId = value; }
+  set disciplineId(value) { this.#disciplineId = value; }
+  set semester(value) { this.#semester = value; }
+  set type(value) { this.#type = value; }
+
+  getColumnValues() {
+    return [this.#groupId, this.#teacherId, this.#disciplineId, this.#semester, this.#type];
+  }
 
   static async findById(id) {
     const result = await query(
@@ -59,22 +73,10 @@ export default class Journal {
                JOIN disciplines d ON d.id = j.discipline_id`;
     const params = [];
     const conditions = [];
-
-    if (groupId) {
-      conditions.push(`j.group_id = $${params.length + 1}`);
-      params.push(groupId);
-    }
-    if (teacherId) {
-      conditions.push(`j.teacher_id = $${params.length + 1}`);
-      params.push(teacherId);
-    }
-    if (discipline) {
-      conditions.push(`d.name ILIKE $${params.length + 1}`);
-      params.push(`%${discipline}%`);
-    }
-    if (conditions.length) {
-      sql += ' WHERE ' + conditions.join(' AND ');
-    }
+    if (groupId) { conditions.push(`j.group_id = $${params.length + 1}`); params.push(groupId); }
+    if (teacherId) { conditions.push(`j.teacher_id = $${params.length + 1}`); params.push(teacherId); }
+    if (discipline) { conditions.push(`d.name ILIKE $${params.length + 1}`); params.push(`%${discipline}%`); }
+    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
     sql += ' ORDER BY d.name, g.name';
     const result = await query(sql, params);
     return result.rows.map((row) => new Journal(row));
@@ -88,7 +90,7 @@ export default class Journal {
        JOIN grade_systems gs ON gs.id = w.grade_system_id
        WHERE w.journal_id = $1 AND w.is_active = true
        ORDER BY w.display_order, w.id`,
-      [this.#id]
+      [this.id]
     );
     return result.rows;
   }
@@ -100,7 +102,7 @@ export default class Journal {
        JOIN lesson_types lt ON lt.id = l.lesson_type_id
        WHERE l.journal_id = $1
        ORDER BY l.display_order, l.lesson_date`,
-      [this.#id]
+      [this.id]
     );
     return result.rows;
   }
@@ -110,124 +112,83 @@ export default class Journal {
       `SELECT s.id, u.full_name, u.login
        FROM students s
        JOIN users u ON u.id = s.user_id
-       WHERE s.group_id = $1
+       JOIN journals j ON j.group_id = s.group_id
+       WHERE j.id = $1
        ORDER BY u.full_name`,
-      [this.#groupId]
+      [this.id]
     );
     return result.rows;
   }
 
   async getGradeTable() {
-    const [worksRes, studentsRes] = await Promise.all([
-      this.getWorks(),
-      this.getStudents(),
-    ]);
-
-    const gradesRes = await query(
+    const students = await this.getStudents();
+    const works = await this.getWorks();
+    const gradesResult = await query(
       `SELECT g.student_id, g.work_id, g.score
        FROM grades g
        JOIN works w ON w.id = g.work_id
        WHERE w.journal_id = $1`,
-      [this.#id]
+      [this.id]
     );
-
-    const gradeMap = new Map();
-    for (const g of gradesRes.rows) {
-      gradeMap.set(`${g.student_id}-${g.work_id}`, g.score);
+    const gradeMap = {};
+    for (const g of gradesResult.rows) {
+      gradeMap[`${g.student_id}-${g.work_id}`] = g.score;
     }
-
-    const table = studentsRes.map((s) => ({
-      studentId: s.id,
-      fullName: s.full_name,
-      grades: worksRes.map((w) => ({
-        workId: w.id,
+    return {
+      students: students.map((s) => ({
+        id: s.id,
+        fullName: s.full_name,
+        login: s.login,
+        grades: works.map((w) => ({
+          workId: w.id,
+          score: gradeMap[`${s.id}-${w.id}`] ?? null,
+        })),
+      })),
+      works: works.map((w) => ({
+        id: w.id,
         title: w.title,
-        score: gradeMap.get(`${s.id}-${w.id}`) ?? null,
-        maxScore: parseFloat(w.max_score),
-        minScore: parseFloat(w.min_score),
-        gradeSystem: w.grade_system_name,
+        type: w.work_type_name,
+        maxScore: w.max_score,
         isMandatory: w.is_mandatory,
       })),
-    }));
-
-    return {
-      journal: {
-        id: this.#id,
-        discipline_name: this.#disciplineName,
-        group_name: this.#groupName,
-        semester: this.#semester,
-      },
-      works: worksRes,
-      table,
     };
   }
 
   async getAttendanceTable() {
-    const [lessonsRes, studentsRes] = await Promise.all([
-      this.getLessons(),
-      this.getStudents(),
-    ]);
-
-    const attendancesRes = await query(
+    const students = await this.getStudents();
+    const lessons = await this.getLessons();
+    const attendanceResult = await query(
       `SELECT a.student_id, a.lesson_id, a.status
        FROM attendances a
        JOIN lessons l ON l.id = a.lesson_id
        WHERE l.journal_id = $1`,
-      [this.#id]
+      [this.id]
     );
-
-    const attendanceMap = new Map();
-    for (const a of attendancesRes.rows) {
-      attendanceMap.set(`${a.student_id}-${a.lesson_id}`, a.status);
+    const attendanceMap = {};
+    for (const a of attendanceResult.rows) {
+      attendanceMap[`${a.student_id}-${a.lesson_id}`] = a.status;
     }
-
-    const table = studentsRes.map((s) => ({
-      studentId: s.id,
-      fullName: s.full_name,
-      attendances: lessonsRes.map((l) => ({
-        lessonId: l.id,
-        lessonDate: l.lesson_date,
-        lessonTypeId: l.lesson_type_id,
-        lessonTypeName: l.lesson_type_name,
-        lessonTypeSlug: l.lesson_type_slug,
-        status: attendanceMap.get(`${s.id}-${l.id}`) ?? null,
-      })),
-    }));
-
     return {
-      journal: {
-        id: this.#id,
-        discipline_name: this.#disciplineName,
-        group_name: this.#groupName,
-        semester: this.#semester,
-      },
-      lessons: lessonsRes,
-      table,
+      students: students.map((s) => ({
+        id: s.id,
+        fullName: s.full_name,
+        login: s.login,
+        attendance: lessons.map((l) => ({
+          lessonId: l.id,
+          status: attendanceMap[`${s.id}-${l.id}`] ?? null,
+        })),
+      })),
+      lessons: lessons.map((l) => ({
+        id: l.id,
+        date: l.lesson_date,
+        type: l.lesson_type_name,
+      })),
     };
-  }
-
-  async save() {
-    if (this.#id) {
-      await query(
-        'UPDATE journals SET group_id = $1, teacher_id = $2, discipline_id = $3, semester = $4, type = $5 WHERE id = $6',
-        [this.#groupId, this.#teacherId, this.#disciplineId, this.#semester, this.#type, this.#id]
-      );
-    } else {
-      const result = await query(
-        'INSERT INTO journals (group_id, teacher_id, discipline_id, semester, type) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-        [this.#groupId, this.#teacherId, this.#disciplineId, this.#semester, this.#type]
-      );
-      this.#id = result.rows[0].id;
-    }
-  }
-
-  async delete() {
-    await query('DELETE FROM journals WHERE id = $1', [this.#id]);
   }
 
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       group_id: this.#groupId,
       group_name: this.#groupName,
       teacher_id: this.#teacherId,

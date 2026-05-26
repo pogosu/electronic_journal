@@ -1,7 +1,10 @@
 import { query } from '../config/db.js';
+import { Entity } from './base/index.js';
 
-export default class Grade {
-  #id;
+export default class Grade extends Entity {
+  static tableName = 'grades';
+  static columns = ['student_id', 'work_id', 'score', 'teacher_id'];
+
   #studentId;
   #workId;
   #score;
@@ -9,7 +12,7 @@ export default class Grade {
   #teacherId;
 
   constructor(data = {}) {
-    this.#id = data.id ?? null;
+    super(data);
     this.#studentId = data.student_id ?? data.studentId ?? null;
     this.#workId = data.work_id ?? data.workId ?? null;
     this.#score = data.score !== null && data.score !== undefined ? parseFloat(data.score) : null;
@@ -17,7 +20,6 @@ export default class Grade {
     this.#teacherId = data.teacher_id ?? data.teacherId ?? null;
   }
 
-  get id() { return this.#id; }
   get studentId() { return this.#studentId; }
   get workId() { return this.#workId; }
   get score() { return this.#score; }
@@ -26,6 +28,30 @@ export default class Grade {
 
   set score(value) { this.#score = value !== null && value !== undefined ? parseFloat(value) : null; }
   set teacherId(value) { this.#teacherId = value; }
+
+  getColumnValues() {
+    return [this.#studentId, this.#workId, this.#score, this.#teacherId];
+  }
+
+  async save() {
+    if (this.id) {
+      await query(
+        'UPDATE grades SET score = $1, grade_date = CURRENT_DATE, teacher_id = $2 WHERE id = $3',
+        [this.#score, this.#teacherId, this.id]
+      );
+    } else {
+      const result = await query(
+        `INSERT INTO grades (student_id, work_id, score, teacher_id) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (student_id, work_id) DO UPDATE SET score = EXCLUDED.score, grade_date = CURRENT_DATE, teacher_id = EXCLUDED.teacher_id
+         RETURNING id`,
+        [this.#studentId, this.#workId, this.#score, this.#teacherId]
+      );
+      if (result.rows[0]?.id) {
+        this._setId(result.rows[0].id);
+      }
+    }
+    return this;
+  }
 
   static async findById(id) {
     const result = await query('SELECT * FROM grades WHERE id = $1', [id]);
@@ -109,25 +135,6 @@ export default class Grade {
     return result.rows;
   }
 
-  async save() {
-    if (this.#id) {
-      await query(
-        'UPDATE grades SET score = $1, grade_date = CURRENT_DATE, teacher_id = $2 WHERE id = $3',
-        [this.#score, this.#teacherId, this.#id]
-      );
-    } else {
-      const result = await query(
-        `INSERT INTO grades (student_id, work_id, score, teacher_id) VALUES ($1, $2, $3, $4) RETURNING id`,
-        [this.#studentId, this.#workId, this.#score, this.#teacherId]
-      );
-      this.#id = result.rows[0].id;
-    }
-  }
-
-  async delete() {
-    await query('DELETE FROM grades WHERE id = $1', [this.#id]);
-  }
-
   static async findByStudentAndWork(studentId, workId) {
     const result = await query(
       'SELECT id FROM grades WHERE student_id = $1 AND work_id = $2',
@@ -152,7 +159,7 @@ export default class Grade {
 
   toJSON() {
     return {
-      id: this.#id,
+      id: this.id,
       student_id: this.#studentId,
       work_id: this.#workId,
       score: this.#score,

@@ -11,13 +11,8 @@ export default class Teacher extends User {
     this.#department = data.department ?? '';
   }
 
-  get teacherId() {
-    return this.#teacherId;
-  }
-
-  get department() {
-    return this.#department;
-  }
+  get teacherId() { return this.#teacherId; }
+  get department() { return this.#department; }
 
   static async findByUserId(userId) {
     const result = await query(
@@ -30,11 +25,6 @@ export default class Teacher extends User {
     );
     if (result.rows.length === 0) return null;
     return new Teacher(result.rows[0]);
-  }
-
-  static async getIdByUserId(userId) {
-    const result = await query('SELECT id FROM teachers WHERE user_id = $1', [userId]);
-    return result.rows[0]?.id ?? null;
   }
 
   static async findById(teacherId) {
@@ -50,9 +40,14 @@ export default class Teacher extends User {
     return new Teacher(result.rows[0]);
   }
 
+  static async getIdByUserId(userId) {
+    const result = await query('SELECT id FROM teachers WHERE user_id = $1', [userId]);
+    return result.rows[0]?.id ?? null;
+  }
+
   async getJournals() {
     const result = await query(
-      `SELECT j.*, g.name as group_name, d.name as discipline_name
+      `SELECT j.*, g.name as group_name, g.admission_year, d.name as discipline_name
        FROM journals j
        JOIN groups g ON g.id = j.group_id
        JOIN disciplines d ON d.id = j.discipline_id
@@ -65,7 +60,7 @@ export default class Teacher extends User {
 
   async getStudents() {
     const result = await query(
-      `SELECT DISTINCT u.id, u.full_name, g.name as group_name, g.admission_year
+      `SELECT DISTINCT s.id, u.full_name, g.name as group_name
        FROM students s
        JOIN users u ON u.id = s.user_id
        JOIN groups g ON g.id = s.group_id
@@ -93,22 +88,17 @@ export default class Teacher extends User {
     const result = await query(
       `SELECT g.id, g.name, g.admission_year,
               gj.id as grade_journal_id, aj.id as attendance_journal_id, ta.semester,
-              COALESCE((
-                SELECT COUNT(DISTINCT s2.id)
-                FROM students s2
+              COALESCE((SELECT COUNT(DISTINCT s2.id) FROM students s2
                 JOIN journals j2 ON j2.group_id = s2.group_id AND j2.discipline_id = $2
                 JOIN works w2 ON w2.journal_id = j2.id AND w2.is_active = true AND w2.is_mandatory = true
                 JOIN work_types wt2 ON wt2.id = w2.work_type_id AND wt2.slug IN ('credit', 'final_exam')
                 JOIN grade_systems gs2 ON gs2.id = w2.grade_system_id
                 LEFT JOIN grades gr2 ON gr2.work_id = w2.id AND gr2.student_id = s2.id
-                WHERE s2.group_id = g.id
-                  AND (
-                    gr2.score IS NULL
-                    OR (gs2.name = 'Зачёт/Незачёт' AND gr2.score = 0)
-                    OR (gs2.name = '5-балльная' AND gr2.score < 3)
-                    OR (gs2.name = 'Произвольная' AND gr2.score < w2.min_score)
-                  )
-              ), 0) as debt_count
+                WHERE s2.group_id = g.id AND (gr2.score IS NULL
+                  OR (gs2.name = 'Зачёт/Незачёт' AND gr2.score = 0)
+                  OR (gs2.name = '5-балльная' AND gr2.score < 3)
+                  OR (gs2.name = 'Произвольная' AND gr2.score < w2.min_score)
+                )), 0) as debt_count
        FROM teacher_assignments ta
        JOIN groups g ON g.id = ta.group_id
        LEFT JOIN journals gj ON gj.group_id = g.id AND gj.discipline_id = ta.discipline_id AND gj.type = 'grades' AND gj.semester = ta.semester
