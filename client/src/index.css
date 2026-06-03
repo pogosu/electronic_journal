@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+}
+
+@layer utilities {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, #224cea 0%, #a020f0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .gradient-bg {
+    background: linear-gradient(135deg, #eef4ff 0%, #f6e8ff 50%, #eef4ff 100%);
+  }
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -10px rgba(34, 76, 234, 0.15), 0 8px 16px -8px rgba(160, 32, 240, 0.1);
+  }
+  .btn-gradient {
+    background: linear-gradient(135deg, #224cea 0%, #7c3aed 100%);
+    transition: all 0.3s ease;
+  }
+  .btn-gradient:hover {
+    background: linear-gradient(135deg, #1a3cd6 0%, #6d28d9 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px -5px rgba(34, 76, 234, 0.3);
+  }
+  .gradient-progress {
+    background: linear-gradient(90deg, #336af5 0%, #7c3aed 50%, #a020f0 100%);
+  }
+  .metric-card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
+    transition: all 0.3s ease;
+  }
+  .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -8px rgba(34, 76, 234, 0.12);
+  }
+  .badge-dot {
+    @apply w-1.5 h-1.5 rounded-full;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Custom selection */
+::selection {
+  background: rgba(34, 76, 234, 0.2);
+  color: #1e293b;
+}

@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temp
+*.tmp
+.cache/
+
+# Virtual environments
+.venv-pdf/
+
+
+# Database backups
+backups/*.sql
+
+# Temporary / generated UML files
+class_uml*
+parse_uml*.py
+sample_report_text.txt
+tz_extracted.txt
+colleague_extracted.txt
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+nginx.conf
+
+# Requirements / TZ documents
+требования/
+
+# Generated report / test artifacts
+*.odt
+server/perf_browser_test.js
+пример_json_ответов.json
+текстовые_описания_тестов.txt
